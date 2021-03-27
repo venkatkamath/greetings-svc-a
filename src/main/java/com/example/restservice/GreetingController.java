@@ -5,17 +5,23 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.Metrics;
+import org.apache.http.client.HttpClient;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.apache.commons.lang3.time.StopWatch;
+
+import static org.apache.http.conn.params.ConnManagerPNames.MAX_TOTAL_CONNECTIONS;
+
 
 @RestController
 @Configuration
@@ -27,6 +33,8 @@ public class GreetingController {
 
 	@Autowired
 	private RestTemplate restTemplate;
+
+
 
 	@GetMapping("/greeting")
 	public Greeting greeting(@RequestParam(value = "name", defaultValue = "World") String name,
@@ -49,7 +57,7 @@ public class GreetingController {
 		StopWatch stopwatch = StopWatch.createStarted();
 
 		try {
-			Thread.sleep(System.currentTimeMillis()%500+200);
+			Thread.sleep(System.currentTimeMillis()%10);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -61,8 +69,22 @@ public class GreetingController {
 	}
 
 	@Bean
-	public RestTemplate restTemplate(RestTemplateBuilder restTemplateBuilder) {
-		return restTemplateBuilder.build();
+	public PoolingHttpClientConnectionManager poolingConnectionManager() {
+		PoolingHttpClientConnectionManager poolingConnectionManager = new PoolingHttpClientConnectionManager();
+		// set a total amount of connections across all HTTP routes
+		poolingConnectionManager.setMaxTotal(200);
+		// set a maximum amount of connections for each HTTP route in pool
+		poolingConnectionManager.setDefaultMaxPerRoute(100);
+		return poolingConnectionManager;
+	}
+
+	@Bean
+	public RestTemplate restTemplate(HttpClient httpClient) {
+		HttpComponentsClientHttpRequestFactory httpRequestFactory = new
+				HttpComponentsClientHttpRequestFactory();
+		httpRequestFactory.setHttpClient(httpClient);
+		RestTemplate restTemplate = new RestTemplate(httpRequestFactory);
+		return restTemplate;
 	}
 
 
